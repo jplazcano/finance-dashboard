@@ -2,10 +2,12 @@ import yfinance as yf
 import pandas as pd
 import streamlit as st
 import plotly.express as px
+import plotly.graph_objects as go
 import datetime as dt
 import io
 import csv
 import plotly
+
 tickers_cedears = ['MELI', 'BABA', 'KO', 'GOLD', 'TSLA',
                      'AAPL', 'AMD', 'VALE', 'META', 'PBR',
                      'AMZN', 'GOOGL', 'VIST', 'TX', 'MSFT',
@@ -38,9 +40,6 @@ def downloadData(dropdown, start, end):
 
 
 def render(tickers, start, end):
-    dropdown = st.multiselect('Choose tickers', tickers, key='render')
-
-
 
     if len(dropdown) > 0:
         df = downloadData(dropdown, start, end)
@@ -79,12 +78,19 @@ def render(tickers, start, end):
 def normalizePrices(df):
     return df.divide(df.iloc[0])
 
-def render_candlestick(tickers):
-    start = st.date_input('Start Date for Candlestick Chart', value=pd.to_datetime('2022-01-01'), key='candle_start')
-    end = st.date_input('End Date for Candlestick Chart', value=pd.to_datetime('today'), key='candle_end')
-
-
-
+def render_candlestick(tickers, start, end):
+    for ticker in tickers:
+        df = downloadData(ticker, start, end)
+        if not df.empty:
+            fig = go.Figure(data=[go.Candlestick(x=df.index,
+                                                 open=df['Open'],
+                                                 high=df['High'],
+                                                 low=df['Low'],
+                                                 close=df['Close'])])
+            fig.update_layout(title=f'{ticker} Candlestick Chart', xaxis_rangeslider_visible=False)
+        else:
+            st.warning(f"No data available for {ticker} in the selected date range.")
+        st.plotly_chart(fig)
 
 
 
@@ -99,16 +105,23 @@ end = st.date_input('End Date', value=pd.to_datetime('today'), key='end')
 if section == 'Argentinian Stocks':
     st.subheader('Argentinian Stocks')
     st.markdown('Results are in ARS')
-    render(tickers_arg_stocks)
+    dropdown = st.multiselect('Choose tickers', tickers_arg_stocks, key='render')
+    render(dropdown, start, end)
+    render_candlestick(dropdown, start, end)
 
 if section == 'CEDEARs':
     st.subheader('CEDEARs')
     st.markdown('Results are in USD')
-    render(tickers_cedears)
+    dropdown = st.multiselect('Choose tickers', tickers_cedears, key='render')
+    render(dropdown, start, end)
+    render_candlestick(dropdown, start, end)
 
 if section == "Crypto":
     st.subheader('Crypto')
     st.markdown('Results are in USD')
-    render(tickers_crypto)
+    dropdown = st.multiselect('Choose tickers', tickers_crypto, key='render')
+    render(dropdown, start, end)
+    render_candlestick(dropdown, start, end)
+
 
 
