@@ -4,6 +4,7 @@ import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
 import datetime as dt
+import ta
 import io
 import csv
 import plotly
@@ -48,7 +49,7 @@ def render(tickers, start, end):
             st.subheader('Price by date')
             normalize_df = normalizePrices(adj_close_df)
             st.dataframe(adj_close_df, use_container_width=True)
-            title = "Normalized Stock Prices for Selected Tickers"
+            title = f"Normalized Stock Prices for Selected Tickers from {start} to {end}"
             fig = px.line(normalize_df, title=title)
             st.plotly_chart(fig)
 
@@ -78,20 +79,32 @@ def render(tickers, start, end):
 def normalizePrices(df):
     return df.divide(df.iloc[0])
 
-def render_candlestick(tickers, start, end):
+def render_candlestick(tickers, start, end, indicators):
     for ticker in tickers:
         df = downloadData(ticker, start, end)
         if not df.empty:
-            fig = go.Figure(data=[go.Candlestick(x=df.index,
+            df = add_indicators(df, sma_period, ema_period)
+            fig = go.Figure()
+            fig.add_trace(go.Candlestick(x=df.index,
                                                  open=df['Open'],
                                                  high=df['High'],
                                                  low=df['Low'],
-                                                 close=df['Close'])])
-            fig.update_layout(title=f'{ticker} Candlestick Chart', xaxis_rangeslider_visible=False)
+                                                 close=df['Adj Close'],
+                                                 name='Candlestick'))
+            if 'SMA' in indicators:
+                fig.add_trace(go.Scatter(x=df.index, y=df['SMA'], name='SMA', line=dict(color='orange')))
+            if 'EMA' in indicators:
+                fig.add_trace(go.Scatter(x=df.index, y=df['EMA'], name='EMA', line=dict(color='purple')))
+            fig.update_layout(title=f'{ticker} Candlestick Chart with indicators (SMA & EMA)', xaxis_rangeslider_visible=False)
+            st.plotly_chart(fig)
         else:
             st.warning(f"No data available for {ticker} in the selected date range.")
-        st.plotly_chart(fig)
 
+
+def add_indicators(df, sma_period, ema_period):
+    df['SMA'] = ta.trend.sma_indicator(df['Adj Close'], window = sma_period)
+    df['EMA'] = ta.trend.ema_indicator(df['Adj Close'], window = ema_period)
+    return df
 
 
 # MAIN APP
@@ -101,27 +114,48 @@ st.sidebar.title("What do you want to analyze?")
 section = st.sidebar.selectbox("", ["Argentinian Stocks", "CEDEARs", "Crypto"])
 start = st.date_input('Start Date', value=pd.to_datetime('2022-01-01'), key='start')
 end = st.date_input('End Date', value=pd.to_datetime('today'), key='end')
+indicators = []
 
 if section == 'Argentinian Stocks':
     st.subheader('Argentinian Stocks')
     st.markdown('Results are in ARS')
     dropdown = st.multiselect('Choose tickers', tickers_arg_stocks, key='render')
     render(dropdown, start, end)
-    render_candlestick(dropdown, start, end)
+    if dropdown:
+        show_candlestick = st.checkbox("Show candlestick charts")
+        if show_candlestick:
+            sma_period = st.number_input('SMA period (days)', min_value=1, value=20, step=1)
+            ema_period = st.number_input('EMA period (days)', min_value=1, value=20, step=1)
+            indicators = ['SMA', 'EMA']
+            render_candlestick(dropdown, start, end, indicators)
 
 if section == 'CEDEARs':
     st.subheader('CEDEARs')
     st.markdown('Results are in USD')
     dropdown = st.multiselect('Choose tickers', tickers_cedears, key='render')
     render(dropdown, start, end)
-    render_candlestick(dropdown, start, end)
+    if dropdown:
+        show_candlestick = st.checkbox("Show candlestick charts")
+        if show_candlestick:
+            sma_period = st.number_input('SMA period (days)', min_value=1, value=20, step=1)
+            ema_period = st.number_input('EMA period (days)', min_value=1, value=20, step=1)
+            indicators = ['SMA', 'EMA']
+            render_candlestick(dropdown, start, end, indicators)
+
 
 if section == "Crypto":
     st.subheader('Crypto')
     st.markdown('Results are in USD')
     dropdown = st.multiselect('Choose tickers', tickers_crypto, key='render')
     render(dropdown, start, end)
-    render_candlestick(dropdown, start, end)
+    if dropdown:
+        show_candlestick = st.checkbox("Show candlestick charts")
+        if show_candlestick:
+            sma_period = st.number_input('SMA period (days)', min_value=1, value=20, step=1)
+            ema_period = st.number_input('EMA period (days)', min_value=1, value=20, step=1)
+            indicators = ['SMA', 'EMA']
+            render_candlestick(dropdown, start, end, indicators)
+
 
 
 
