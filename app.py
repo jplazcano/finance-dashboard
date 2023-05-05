@@ -206,7 +206,3 @@ if section == "Crypto":
             ema_period = st.number_input('EMA period (days)', min_value=1, value=20, step=1)
             indicators = ['SMA', 'EMA']
             render_candlestick(dropdown, start, end, indicators)
-
-
-
-
