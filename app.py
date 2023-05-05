@@ -36,12 +36,54 @@ tickers_crypto = ['BTC-USD', 'ETH-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD',
 
 @st.cache_data()
 def downloadData(dropdown, start, end):
+    """Download price data for a list of tickers from Yahoo Finance.
+
+    Args:
+        dropdown (list): List of tickers.
+        start (datetime): Start date.
+        end (datetime): End date.
+
+    Returns:
+        DataFrame: A Pandas DataFrame with the price data.
+    """
+
     df = yf.download(dropdown, start=start, end=end)
     return df
 
+def normalizePrices(df):
+    """Normalize price data by dividing each value by the first value in the series.
+
+    Args:
+        df (DataFrame): A Pandas DataFrame with price data.
+
+    Returns:
+        DataFrame: A Pandas DataFrame with the normalized price data.
+    """
+    return df.divide(df.iloc[0])
+
+def add_indicators(df, sma_period, ema_period):
+    """Add Simple Moving Average (SMA) and Exponential Moving Average (EMA) indicators to the price data.
+
+        Args:
+            df (DataFrame): A Pandas DataFrame with price data.
+            sma_period (int): The period for the Simple Moving Average calculation.
+            ema_period (int): The period for the Exponential Moving Average calculation.
+
+        Returns:
+            DataFrame: A Pandas DataFrame with the price data and added SMA and EMA indicators.
+        """
+    df['SMA'] = ta.trend.sma_indicator(df['Adj Close'], window = sma_period)
+    df['EMA'] = ta.trend.ema_indicator(df['Adj Close'], window = ema_period)
+    return df
 
 def render(tickers, start, end):
+    """Display normalized stock prices and percentage change for selected tickers.
 
+        Args:
+            tickers (list): List of tickers.
+            start (datetime): Start date.
+            end (datetime): End date.
+        """
     if len(dropdown) > 0:
         df = downloadData(dropdown, start, end)
         if not df.empty:
@@ -59,27 +101,28 @@ def render(tickers, start, end):
                 if len(dropdown) == 1:
                     if not (pd.isnull(adj_close_df[-1]) or pd.isnull(adj_close_df[0])):
                         pct_change = (adj_close_df[-1] - adj_close_df[0]) / adj_close_df[0] * 100
-                        st.write(f"Percentage change for {ticker}: {pct_change:.2f}%")
+                        st.metric(label=f"Percentage change for {ticker}", value=f"{pct_change:.2f}%", delta=None)
                     else:
                         st.write(f"Percentage change for {ticker}: Data not available")
                 else:
                     if not (pd.isnull(adj_close_df[ticker][-1]) or pd.isnull(adj_close_df[ticker][0])):
                         pct_change = (adj_close_df[ticker][-1] - adj_close_df[ticker][0]) / adj_close_df[ticker][
                             0] * 100
-                        st.write(f"Percentage change for {ticker}: {pct_change:.2f}%")
+                        st.metric(label=f"Percentage change for {ticker}", value=f"{pct_change:.2f}%", delta=None)
                     else:
                         st.write(f"Percentage change for {ticker}: Data not available")
-
-
-
-
         else:
             st.warning("No data available for the selected tickers and date range.")
 
-def normalizePrices(df):
-    return df.divide(df.iloc[0])
-
 def render_candlestick(tickers, start, end, indicators):
+    """Display candlestick charts with SMA and EMA indicators for selected tickers.
+
+        Args:
+            tickers (list): List of tickers.
+            start (datetime): Start date.
+            end (datetime): End date.
+            indicators (list): List of indicator names (e.g., ['SMA', 'EMA']).
+        """
     for ticker in tickers:
         df = downloadData(ticker, start, end)
         if not df.empty:
@@ -101,32 +144,40 @@ def render_candlestick(tickers, start, end, indicators):
             st.warning(f"No data available for {ticker} in the selected date range.")
 
 
-def add_indicators(df, sma_period, ema_period):
-    df['SMA'] = ta.trend.sma_indicator(df['Adj Close'], window = sma_period)
-    df['EMA'] = ta.trend.ema_indicator(df['Adj Close'], window = ema_period)
-    return df
-
-
 # MAIN APP
 
-
+# Display a title and a select box in the sidebar to choose the section
 st.sidebar.title("What do you want to analyze?")
 section = st.sidebar.selectbox("", ["Argentinian Stocks", "CEDEARs", "Crypto"])
+
+# Display date inputs in the sidebar to select the start and end dates for analysis
 start = st.date_input('Start Date', value=pd.to_datetime('2022-01-01'), key='start')
 end = st.date_input('End Date', value=pd.to_datetime('today'), key='end')
+
+# Initialize an empty list to store the selected indicators later
 indicators = []
 
+# If the selected section is 'Argentinian Stocks'
 if section == 'Argentinian Stocks':
     st.subheader('Argentinian Stocks')
     st.markdown('Results are in ARS')
+
+    # Display a multi-select input to choose tickers
     dropdown = st.multiselect('Choose tickers', tickers_arg_stocks, key='render')
+
+    # Call the render function to display the data and charts for the selected tickers
     render(dropdown, start, end)
+
+    # If at least one ticker is selected, display a checkbox to show candlestick charts
     if dropdown:
         show_candlestick = st.checkbox("Show candlestick charts")
         if show_candlestick:
+            # Display inputs for SMA and EMA periods
             sma_period = st.number_input('SMA period (days)', min_value=1, value=20, step=1)
             ema_period = st.number_input('EMA period (days)', min_value=1, value=20, step=1)
             indicators = ['SMA', 'EMA']
+
+            # Call the render_candlestick function to display the candlestick charts with the selected indicators
             render_candlestick(dropdown, start, end, indicators)
 
 if section == 'CEDEARs':
